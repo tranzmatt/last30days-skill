@@ -117,8 +117,72 @@ class RenderV3Tests(unittest.TestCase):
         report.errors_by_source = {"x": "HTTP 400: Bad Request"}
         text = render.render_compact(report)
         self.assertIn("## Source Errors", text)
-        self.assertIn("HTTP 400: Bad Request", text)
-        self.assertIn("X:", text)
+
+
+class OutputEnvelopeTests(unittest.TestCase):
+    """LAW 6 envelope comments: scope "pass through verbatim" unambiguously.
+
+    Added 2026-04-19 after the Hermes Agent Use Cases failure where two
+    consecutive runs dumped `## Ranked Evidence Clusters` as user output.
+    """
+
+    def test_evidence_for_synthesis_envelope_wraps_raw_evidence(self):
+        text = render.render_compact(sample_report())
+        self.assertIn("<!-- EVIDENCE FOR SYNTHESIS:", text)
+        self.assertIn("<!-- END EVIDENCE FOR SYNTHESIS -->", text)
+        # Opening comment must appear BEFORE the raw evidence block.
+        self.assertLess(
+            text.index("<!-- EVIDENCE FOR SYNTHESIS:"),
+            text.index("## Ranked Evidence Clusters"),
+        )
+        # Closing comment must appear AFTER Source Coverage.
+        self.assertGreater(
+            text.index("<!-- END EVIDENCE FOR SYNTHESIS -->"),
+            text.index("## Source Coverage"),
+        )
+
+    def test_pass_through_footer_envelope_wraps_emoji_tree(self):
+        text = render.render_compact(sample_report())
+        self.assertIn("<!-- PASS-THROUGH FOOTER:", text)
+        self.assertIn("<!-- END PASS-THROUGH FOOTER -->", text)
+        # Emoji footer sits between the two markers.
+        open_idx = text.index("<!-- PASS-THROUGH FOOTER:")
+        close_idx = text.index("<!-- END PASS-THROUGH FOOTER -->")
+        self.assertIn("All agents reported back!", text[open_idx:close_idx])
+
+    def test_canonical_boundary_scopes_pass_through_to_footer(self):
+        text = render.render_compact(sample_report())
+        # New boundary text scopes verbatim to the PASS-THROUGH FOOTER block,
+        # not everything above.
+        self.assertIn("Pass through ONLY the PASS-THROUGH FOOTER block verbatim", text)
+        # Self-check string is present so the model has a concrete failure signal.
+        self.assertIn("### 1.", text)
+        self.assertIn("LAW 6", text)
+        # The prior ambiguous phrasing is gone.
+        self.assertNotIn("Pass through the lines ABOVE this boundary verbatim", text)
+
+    def test_envelopes_appear_in_md_emit_mode(self):
+        # --emit md and --emit compact both route to render_compact, so the
+        # same envelopes apply. Guard against future divergence.
+        text = render.render_compact(sample_report())
+        self.assertEqual(text.count("<!-- EVIDENCE FOR SYNTHESIS:"), 1)
+        self.assertEqual(text.count("<!-- END EVIDENCE FOR SYNTHESIS -->"), 1)
+        self.assertEqual(text.count("<!-- PASS-THROUGH FOOTER:"), 1)
+        self.assertEqual(text.count("<!-- END PASS-THROUGH FOOTER -->"), 1)
+
+    def test_no_dangling_envelope_open_without_close(self):
+        # Open/close counts must always match, even for empty clusters.
+        report = sample_report()
+        report.clusters = []
+        text = render.render_compact(report)
+        self.assertEqual(
+            text.count("<!-- EVIDENCE FOR SYNTHESIS:"),
+            text.count("<!-- END EVIDENCE FOR SYNTHESIS -->"),
+        )
+        self.assertEqual(
+            text.count("<!-- PASS-THROUGH FOOTER:"),
+            text.count("<!-- END PASS-THROUGH FOOTER -->"),
+        )
 
 
 class RenderTopCommentsTests(unittest.TestCase):

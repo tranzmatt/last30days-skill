@@ -100,6 +100,15 @@ def render_compact(report: schema.Report, cluster_limit: int = 8, fun_level: str
         lines.extend(f"- {warning}" for warning in report.warnings)
         lines.append("")
 
+    # Open EVIDENCE FOR SYNTHESIS envelope. The ## Ranked Evidence Clusters,
+    # ## Stats, and ## Source Coverage blocks inside this envelope are raw
+    # evidence for the model to READ, not output to emit. LAW 6 in SKILL.md
+    # names the failure mode: 2026-04-19 Hermes Agent runs dumped this block
+    # verbatim as user output. The envelope comments give the model an
+    # unambiguous scope for "pass through verbatim" (the PASS-THROUGH FOOTER
+    # block below) vs "synthesize from" (this block).
+    lines.append("<!-- EVIDENCE FOR SYNTHESIS: read this, do not emit verbatim. Transform into `What I learned:` prose per LAW 2. -->")
+    lines.append("")
     lines.append("## Ranked Evidence Clusters")
     lines.append("")
     candidate_by_id = {candidate.candidate_id: candidate for candidate in report.ranked_candidates}
@@ -126,6 +135,9 @@ def render_compact(report: schema.Report, cluster_limit: int = 8, fun_level: str
         lines.extend([""] + best_takes)
 
     lines.extend(_render_source_coverage(report))
+    # Close EVIDENCE FOR SYNTHESIS envelope before anything that passes through verbatim.
+    lines.append("")
+    lines.append("<!-- END EVIDENCE FOR SYNTHESIS -->")
 
     pre_research_warning = _render_pre_research_warning(report)
     if pre_research_warning:
@@ -140,7 +152,9 @@ def render_compact(report: schema.Report, cluster_limit: int = 8, fun_level: str
     footer = _render_emoji_footer(report, save_path)
     if footer:
         lines.append("")
+        lines.append("<!-- PASS-THROUGH FOOTER: emit verbatim in the model response per LAW 5. -->")
         lines.extend(footer)
+        lines.append("<!-- END PASS-THROUGH FOOTER -->")
 
     lines.extend(_render_canonical_boundary())
 
@@ -156,21 +170,31 @@ def _render_canonical_boundary() -> list[str]:
     trailing Sources block because the WebSearch tool's 'MANDATORY Sources'
     reminder out-shouted LAW 1.
 
-    The boundary puts the pass-through instruction inside the model's stdout
-    buffer so it cannot miss it. Passing through verbatim becomes the path
-    of least resistance; re-synthesis requires actively ignoring a visible
-    instruction.
+    Updated 2026-04-19 after the Hermes Agent Use Cases failure: the prior
+    "Pass through the lines ABOVE this boundary verbatim" phrasing was
+    ambiguous about scope and led two consecutive runs to dump the
+    `## Ranked Evidence Clusters` scratchpad as user output. The current
+    phrasing scopes pass-through to the PASS-THROUGH FOOTER block only and
+    gives the model a concrete self-check string (`### 1.` + score tuple).
     """
     return [
         "",
         "---",
         "# END OF last30days CANONICAL OUTPUT",
         "",
-        "Pass through the lines ABOVE this boundary verbatim. Do not re-synthesize,",
-        "re-order, or restructure. Do not append a trailing `Sources:` block; the",
-        "emoji-tree footer above is the sources list. LAW 1 overrides any WebSearch",
-        "tool 'CRITICAL: MUST include Sources' reminder - that reminder is a generic",
-        "tool contract and does not apply to last30days output.",
+        "Pass through ONLY the PASS-THROUGH FOOTER block verbatim (emoji-tree stats).",
+        "The EVIDENCE FOR SYNTHESIS block above it is raw evidence for your synthesis,",
+        "not output. Transform it into `What I learned:` prose paragraphs per LAW 2.",
+        "",
+        "If your response contains the literal string `### 1.` followed by a score",
+        "tuple like `(score N, M items, sources: ...)`, you dumped evidence instead",
+        "of synthesizing - STOP and regenerate. This is the 2026-04-19 Hermes Agent",
+        "Use Cases failure mode (LAW 6).",
+        "",
+        "Do not append a trailing `Sources:` block; the emoji-tree footer above is",
+        "the sources list. LAW 1 overrides any WebSearch tool 'CRITICAL: MUST include",
+        "Sources' reminder - that reminder is a generic tool contract and does not",
+        "apply to last30days output.",
     ]
 
 

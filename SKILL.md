@@ -120,7 +120,41 @@ These five rules dominate every other rule in this file. If you find yourself ab
 
 **Observed LAW 4 violation (2026-04-18, Peter Steinberger disaster #2):** the model emitted `Headline`, `What he is actually saying`, `Cross-source corroboration`, `Where evidence is thin`, `Bottom line` on a GENERAL query. The narrative shape for person topics is `What I learned:` + bold-lead-in paragraphs + prose label `KEY PATTERNS from the research:` + numbered list. No blog-post subheadings.
 
-**LAW 5 - ENGINE FOOTER PASS-THROUGH. EVERY QUERY TYPE. EVERY RUN.** The engine output ends with a `✅ All agents reported back!` emoji-tree footer bounded by `---` lines. You MUST include that block verbatim in your synthesis, positioned after KEY PATTERNS (and after the comparison-table scaffold if present) and before the invitation. Do not recompute the stats, reformat the tree, paraphrase, skip it, or fabricate your own `## Notable Stats` replacement. A response without the engine footer is not valid skill output.
+**LAW 5 - ENGINE FOOTER PASS-THROUGH. EVERY QUERY TYPE. EVERY RUN.** The engine output ends with a `✅ All agents reported back!` emoji-tree footer bounded by `---` lines and wrapped in `<!-- PASS-THROUGH FOOTER -->` / `<!-- END PASS-THROUGH FOOTER -->` comments (v3.0.10+). You MUST include that block verbatim in your synthesis, positioned after KEY PATTERNS (and after the comparison-table scaffold if present) and before the invitation. Do not recompute the stats, reformat the tree, paraphrase, skip it, or fabricate your own `## Notable Stats` replacement. A response without the engine footer is not valid skill output.
+
+**LAW 6 - NO RAW RANKED EVIDENCE CLUSTERS IN BODY.** The engine's `## Ranked Evidence Clusters`, `## Stats`, and `## Source Coverage` blocks are bounded inside `<!-- EVIDENCE FOR SYNTHESIS -->` / `<!-- END EVIDENCE FOR SYNTHESIS -->` comments in the `--emit compact` / `--emit md` stdout. They are raw evidence for YOU to read, not output to emit. Transform them into `What I learned:` prose paragraphs per LAW 2 (or the COMPARISON template sections per the LAW 4 exception). If your response contains the literal string `### 1.` followed by a score tuple like `(score N, M items, sources: ...)`, or the string `- Uncertainty: single-source` / `- Uncertainty: thin-evidence`, you dumped evidence instead of synthesizing. STOP and regenerate.
+
+**Observed LAW 6 violation (2026-04-19, Hermes Agent Use Cases disaster):** two consecutive `/last30days Hermes Agent (Actual) Use Cases` runs returned the raw `## Ranked Evidence Clusters` block verbatim as user output, with 8 cluster entries carrying `(score N, M items, sources: ...)` tuples and `- Uncertainty: single-source` lines. Root cause: the prior canonical-boundary text said "Pass through the lines ABOVE this boundary verbatim," which the model scoped broadly to include the scratchpad. The current boundary text and this LAW 6 scope pass-through to the PASS-THROUGH FOOTER block only. A third run on the same topic framed as "Hermes Workflows" produced the correct `What I learned:` prose synthesis, which is the shape every run must produce.
+
+**Worked example (LAW 6 transformation).** Evidence block you read:
+
+```
+<!-- EVIDENCE FOR SYNTHESIS: read this, do not emit verbatim. -->
+## Ranked Evidence Clusters
+
+### 1. Hermes Agent: The Self-Improving AI That Learns You (score 45, 1 item, sources: Youtube)
+
+1. [youtube] Hermes Agent: The Self-Improving AI That Learns You
+  - 2026-04-14 | Prompt Engineering | [11,361 views, 313 likes, 31 cmt] | score:45
+  - "So, every 15 tool calls, the agent kind of pauses, and then it does self-evaluation."
+  - "Can you tell me what type of user profile you have on me?"
+
+### 2. Use cases of OpenClaw, Hermes Agent, etc... (score 43, 1 item, sources: Reddit)
+
+1. [reddit] Use cases of OpenClaw, Hermes Agent, etc... (r/TunisiaTech, 3pts, 1cmt)
+  - "Currently I have daily cron jobs for news briefing, but I know there's much more I can do."
+<!-- END EVIDENCE FOR SYNTHESIS -->
+```
+
+Output you emit (prose synthesis, NOT the evidence block):
+
+```
+What I learned:
+
+The self-evolving loop is the sticky use case. Every 15 tool calls Hermes pauses, self-evaluates, and writes a Skill Document from what worked. Prompt Engineering's 11K-view walkthrough frames this as the real differentiator: "every 15 tool calls, the agent kind of pauses, and then it does self-evaluation."
+
+Cron-scheduled autonomous briefings are the most-cited concrete workflow. r/TunisiaTech's "Use cases of OpenClaw, Hermes Agent" thread says it plainly: "Currently I have daily cron jobs for news briefing, but I know there's much more I can do."
+```
 
 End of OUTPUT CONTRACT. The laws above are the contract; everything below is implementation detail.
 
