@@ -100,6 +100,15 @@ def render_compact(report: schema.Report, cluster_limit: int = 8, fun_level: str
         lines.extend(f"- {warning}" for warning in report.warnings)
         lines.append("")
 
+    # LAW 7 backstop: emit the DEGRADED RUN WARNING block BEFORE the evidence
+    # envelope so the model's pass-through contract forces it into the user's
+    # response on bare named-entity calls. The stderr [Planner] warning is
+    # invisible to the user; this block is not.
+    degraded_warning = _render_degraded_run_warning(report)
+    if degraded_warning:
+        lines.extend(degraded_warning)
+        lines.append("")
+
     # Open EVIDENCE FOR SYNTHESIS envelope. The ## Ranked Evidence Clusters,
     # ## Stats, and ## Source Coverage blocks inside this envelope are raw
     # evidence for the model to READ, not output to emit. LAW 6 in SKILL.md
@@ -261,6 +270,63 @@ def _render_pre_research_warning(report: schema.Report) -> list[str]:
         "If this topic really is abstract (e.g. \"AI regulation\") and doesn't need",
         "handle resolution, add `--auto-resolve` to the engine command or ignore this",
         "warning - the current results are the keyword-search fallback.",
+    ]
+
+
+def _render_degraded_run_warning(report: schema.Report) -> list[str]:
+    """Emit a user-visible DEGRADED RUN WARNING block when:
+    - The engine ran the deterministic fallback planner (source=deterministic), AND
+    - No pre-research flags were passed (bare invocation), AND
+    - The topic is pre-research-eligible (a named entity).
+
+    Runtime-agnostic: this skill ships to Claude Code, Codex, Hermes, Gemini,
+    and ~/.agents. The banner enumerates them explicitly so the hosting
+    reasoning model recognizes itself regardless of runtime.
+
+    Positioned BEFORE the EVIDENCE FOR SYNTHESIS envelope in render_compact
+    so the model's pass-through contract forces it into the user's view per
+    LAW 7. The 2026-04-19 Hermes Agent Use Cases Run 1 failure mode: the
+    engine's stderr warning about "no LLM provider" was invisible to the
+    user because Claude hid stderr. User-visible stdout block is the
+    backstop that makes silent degradation impossible.
+    """
+    plan_source = report.artifacts.get("plan_source", "unknown")
+    flags_present = bool(report.artifacts.get("pre_research_flags_present", False))
+    if plan_source != "deterministic":
+        return []
+    if flags_present:
+        return []
+    if not _is_pre_research_eligible(report.topic):
+        return []
+
+    return [
+        "<!-- USER-VISIBLE BANNER: emit verbatim before synthesis per LAW 5 / LAW 7. -->",
+        "## DEGRADED RUN WARNING",
+        "",
+        f"⚠️  This run was called BARE on a named-entity topic (\"{report.topic}\"):",
+        "no `--plan` JSON, no pre-flight handle resolution. The engine ran",
+        "deterministic fallback retrieval, which is the cron/headless path -",
+        "weaker than the path where the hosting reasoning model authors its own",
+        "plan upstream.",
+        "",
+        "**If you are the reasoning model hosting this skill** (Claude Code, Codex,",
+        "Hermes, Gemini, or any agent runtime that invoked `/last30days`): YOU ARE",
+        "THE LLM. You do not need an API key, provider credentials, or an external",
+        "planning service. The `--plan` flag exists precisely so a reasoning model",
+        "generates its own JSON plan upstream and passes it in. That is you.",
+        "Generate a plan with `intent` / `freshness_mode` / 3-5 paraphrased",
+        "subqueries and re-run with `--plan '$JSON'`. This is not a",
+        "missing-credentials problem; this is a skipped-LAW-7 problem.",
+        "",
+        "What went wrong: on a named-entity topic, the full contract is",
+        "(a) resolve X handles / GitHub repos / subreddits via your runtime's",
+        "web-search tool (Step 0.55) and (b) generate a JSON `--plan` yourself",
+        "and pass it via `--plan '$JSON'` (Step 0.75 / LAW 7). Both were skipped.",
+        "",
+        "**If you are a user reading this:** the assistant skipped its own",
+        "planning step. Ask it to regenerate following Step 0.55 and Step 0.75",
+        "of SKILL.md.",
+        "<!-- END USER-VISIBLE BANNER -->",
     ]
 
 

@@ -462,5 +462,66 @@ class RenderBestTakesCompactTests(unittest.TestCase):
         self.assertNotIn("## Best Takes", text)
 
 
+class DegradedRunBannerTests(unittest.TestCase):
+    """Unit 1: DEGRADED RUN WARNING surfaces bare named-entity invocations
+    in user-visible stdout. LAW 7 backstop. 2026-04-19 Hermes Agent Use
+    Cases Run 1 failure mode.
+    """
+
+    def _bare_named_entity_report(self) -> schema.Report:
+        report = sample_report()
+        report.topic = "Hermes Agent"
+        report.artifacts["plan_source"] = "deterministic"
+        report.artifacts["pre_research_flags_present"] = False
+        return report
+
+    def test_banner_appears_on_bare_named_entity_deterministic_run(self):
+        text = render.render_compact(self._bare_named_entity_report())
+        self.assertIn("## DEGRADED RUN WARNING", text)
+        self.assertIn("<!-- USER-VISIBLE BANNER:", text)
+        self.assertIn("<!-- END USER-VISIBLE BANNER -->", text)
+        self.assertIn("YOU ARE", text)
+        # Runtime-agnostic enumeration: all host runtimes appear.
+        for runtime_name in ("Claude Code", "Codex", "Hermes", "Gemini"):
+            self.assertIn(runtime_name, text)
+
+    def test_banner_positioned_before_evidence_envelope(self):
+        text = render.render_compact(self._bare_named_entity_report())
+        banner_idx = text.index("## DEGRADED RUN WARNING")
+        envelope_idx = text.index("<!-- EVIDENCE FOR SYNTHESIS:")
+        self.assertLess(banner_idx, envelope_idx,
+            "DEGRADED RUN banner must appear BEFORE evidence envelope so pass-through catches it.")
+
+    def test_banner_suppressed_when_plan_source_external(self):
+        report = self._bare_named_entity_report()
+        report.artifacts["plan_source"] = "external"
+        text = render.render_compact(report)
+        self.assertNotIn("## DEGRADED RUN WARNING", text)
+
+    def test_banner_suppressed_when_plan_source_llm(self):
+        report = self._bare_named_entity_report()
+        report.artifacts["plan_source"] = "llm"
+        text = render.render_compact(report)
+        self.assertNotIn("## DEGRADED RUN WARNING", text)
+
+    def test_banner_suppressed_when_pre_research_flags_present(self):
+        report = self._bare_named_entity_report()
+        report.artifacts["pre_research_flags_present"] = True
+        text = render.render_compact(report)
+        self.assertNotIn("## DEGRADED RUN WARNING", text)
+
+    def test_banner_suppressed_on_non_eligible_abstract_topic(self):
+        report = self._bare_named_entity_report()
+        # Multi-word lowercase abstract phrase is NOT pre-research-eligible.
+        report.topic = "how to deploy containers in the cloud"
+        text = render.render_compact(report)
+        self.assertNotIn("## DEGRADED RUN WARNING", text)
+
+    def test_banner_mentions_law_7_and_plan_flag(self):
+        text = render.render_compact(self._bare_named_entity_report())
+        self.assertIn("LAW 7", text)
+        self.assertIn("--plan", text)
+
+
 if __name__ == "__main__":
     unittest.main()

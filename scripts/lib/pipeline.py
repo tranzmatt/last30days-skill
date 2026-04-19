@@ -254,6 +254,10 @@ def run(
         print("[Planner]   (no subqueries in plan)", file=sys.stderr)
 
     bundle = schema.RetrievalBundle(artifacts={"grounding": []})
+    # Expose plan_source to the renderer so render_compact can emit the
+    # DEGRADED RUN banner when a named-entity topic was invoked bare
+    # (source=deterministic AND no pre-research flags). LAW 7 backstop.
+    bundle.artifacts["plan_source"] = plan_source
 
     # Project-mode or person-mode GitHub: run once before the main subquery loop
     _github_custom_done = False
