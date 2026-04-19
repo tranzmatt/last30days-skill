@@ -178,8 +178,82 @@ class RerankV3Tests(unittest.TestCase):
         self.assertEqual("gemini-3.1-flash-lite-preview", provider.model)
         self.assertEqual(95.0, first.rerank_score)
         self.assertEqual("high fit", first.explanation)
-        self.assertEqual("fallback-local-score", second.explanation)
+        # Tail is scored via the fallback (may or may not carry the entity-miss
+        # suffix depending on topic-title overlap; assert the base tag is present).
+        self.assertIn("fallback-local-score", second.explanation or "")
         self.assertEqual(first.candidate_id, ranked[0].candidate_id)
+
+
+class EntityGroundingTests(unittest.TestCase):
+    """Unit 4: Reranker entity-grounding demotion. 2026-04-19 Hermes Agent
+    Use Cases failure: an off-topic video about Claude Managed Agents
+    scored 51 and ranked #2 with zero Hermes content.
+    """
+
+    def _candidate(self, title: str, snippet: str = "") -> schema.Candidate:
+        return schema.Candidate(
+            candidate_id=f"c-{title[:10]}",
+            item_id="i1",
+            source="youtube",
+            title=title,
+            url="https://example.com",
+            snippet=snippet,
+            subquery_labels=["primary"],
+            native_ranks={"primary:youtube": 1},
+            local_relevance=0.8,
+            freshness=80,
+            engagement=50,
+            source_quality=0.7,
+            rrf_score=0.02,
+        )
+
+    def test_primary_entity_strips_intent_modifier(self):
+        self.assertEqual("Hermes Agent", rerank._primary_entity("Hermes Agent use cases"))
+        self.assertEqual("Hermes Agent Actual", rerank._primary_entity("Hermes Agent Actual Use Cases"))
+        self.assertEqual("Claude Code", rerank._primary_entity("Claude Code workflows"))
+        self.assertEqual("DSPy", rerank._primary_entity("DSPy tutorial"))
+
+    def test_primary_entity_leaves_bare_entity_unchanged(self):
+        self.assertEqual("Kanye West", rerank._primary_entity("Kanye West"))
+        self.assertEqual("Nous Research", rerank._primary_entity("Nous Research"))
+
+    def test_fallback_demotes_candidate_without_primary_entity(self):
+        on_topic = self._candidate("Hermes Agent: Self-Improving AI", "Nous Research Hermes walkthrough")
+        off_topic = self._candidate("I Tested Claude's Managed Agents", "What you need to know about Anthropic's new managed agents")
+        rerank._apply_fallback_scores([on_topic, off_topic], primary_entity="Hermes Agent")
+        self.assertGreater(on_topic.final_score, off_topic.final_score)
+        self.assertIn("entity-miss", off_topic.explanation or "")
+        self.assertEqual(on_topic.explanation, "fallback-local-score")
+
+    def test_fallback_match_is_case_insensitive(self):
+        on_topic = self._candidate("HERMES agent rocks", "some text")
+        rerank._apply_fallback_scores([on_topic], primary_entity="Hermes Agent")
+        self.assertEqual("fallback-local-score", on_topic.explanation)
+
+    def test_fallback_skips_demotion_for_empty_text_candidates(self):
+        empty = self._candidate("", "")
+        rerank._apply_fallback_scores([empty], primary_entity="Hermes Agent")
+        self.assertEqual("fallback-local-score", empty.explanation)
+
+    def test_fallback_skips_demotion_when_no_primary_entity(self):
+        off = self._candidate("Completely unrelated", "snippet")
+        rerank._apply_fallback_scores([off], primary_entity="")
+        self.assertEqual("fallback-local-score", off.explanation)
+
+    def test_llm_prompt_includes_primary_entity_grounding_hint(self):
+        candidate = self._candidate("Something", "snippet text")
+        plan = make_plan()
+        prompt = rerank._build_prompt(
+            "Hermes Agent use cases", plan, [candidate], primary_entity="Hermes Agent"
+        )
+        self.assertIn("Primary entity grounding", prompt)
+        self.assertIn("Hermes Agent", prompt)
+
+    def test_llm_prompt_omits_grounding_hint_when_no_primary_entity(self):
+        candidate = self._candidate("Something", "snippet text")
+        plan = make_plan()
+        prompt = rerank._build_prompt("", plan, [candidate], primary_entity="")
+        self.assertNotIn("Primary entity grounding", prompt)
 
 
 if __name__ == "__main__":
