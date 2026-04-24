@@ -1,6 +1,6 @@
 ---
 name: last30days
-version: "3.0.10"
+version: "3.1.1"
 description: "Research what people actually say about any topic in the last 30 days. Pulls posts and engagement from Reddit, X, YouTube, TikTok, Hacker News, Polymarket, GitHub, and the web."
 argument-hint: 'last30days nvidia earnings reaction | last30days AI video tools | last30days what users want in react'
 allowed-tools: Bash, Read, Write, AskUserQuestion, WebSearch
@@ -233,7 +233,7 @@ If your Bash call to `last30days.py` does NOT include the FULL pre-flight checkl
 
 ---
 
-# last30days v3.0.10: Research Any Topic from the Last 30 Days
+# last30days v3.1.1: Research Any Topic from the Last 30 Days
 
 > **Permissions overview:** Reads public web/platform data and optionally saves research briefings to `LAST30DAYS_MEMORY_DIR` (defaults to `~/Documents/Last30Days`). X/Twitter search uses optional user-provided tokens (AUTH_TOKEN/CT0 env vars). Bluesky search uses optional app password (BSKY_HANDLE/BSKY_APP_PASSWORD env vars - create at bsky.app/settings/app-passwords). All credential usage and data writes are documented in the [Security & Permissions](#security--permissions) section.
 
@@ -877,7 +877,13 @@ SKILL_ROOT="${SKILL_ROOT%/}"
 if [ -z "$SKILL_ROOT" ] || [ ! -f "$SKILL_ROOT/scripts/last30days.py" ]; then
   CLAUDE_PLUGIN_ROOT="$(ls -d "$HOME/.claude/plugins/cache/last30days-skill/last30days/"*/ 2>/dev/null | sort -V | tail -1)"
   CLAUDE_PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT%/}"
-  [ -n "$CLAUDE_PLUGIN_ROOT" ] && [ -f "$CLAUDE_PLUGIN_ROOT/scripts/last30days.py" ] && SKILL_ROOT="$CLAUDE_PLUGIN_ROOT"
+  if [ -n "$CLAUDE_PLUGIN_ROOT" ]; then
+    if [ -f "$CLAUDE_PLUGIN_ROOT/skills/last30days/scripts/last30days.py" ]; then
+      SKILL_ROOT="$CLAUDE_PLUGIN_ROOT/skills/last30days"
+    elif [ -f "$CLAUDE_PLUGIN_ROOT/scripts/last30days.py" ]; then
+      SKILL_ROOT="$CLAUDE_PLUGIN_ROOT"
+    fi
+  fi
 fi
 
 # Fallback for repo checkout / Gemini / local development hosts where the plugin cache does not exist.
@@ -890,7 +896,7 @@ fi
 if [ -z "${SKILL_ROOT:-}" ] || [ ! -f "$SKILL_ROOT/scripts/last30days.py" ]; then
   echo "ERROR: Could not find scripts/last30days.py in Codex/Claude plugin cache or repo checkout" >&2
   echo "Expected Codex: $HOME/.codex/plugins/cache/{MARKETPLACE}/last30days/{VERSION}/skills/last30days/scripts/last30days.py" >&2
-  echo "Expected Claude: $HOME/.claude/plugins/cache/last30days-skill/last30days/{VERSION}/scripts/last30days.py" >&2
+  echo "Expected Claude: $HOME/.claude/plugins/cache/last30days-skill/last30days/{VERSION}/skills/last30days/scripts/last30days.py" >&2
   exit 1
 fi
 
