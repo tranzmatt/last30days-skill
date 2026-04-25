@@ -1,7 +1,7 @@
 {
   "name": "last30days",
   "version": "3.1.1",
-  "description": "Research any topic across Reddit, X, YouTube, TikTok, Instagram, Hacker News, Polymarket, GitHub, and more sources.",
+  "description": "Research any topic across Reddit, X, YouTube, TikTok, Instagram, Hacker News, Polymarket, GitHub, and 5+ more sources. AI agent scores by upvotes, likes, and real money - not editors.",
   "author": {
     "name": "Matt Van Horn",
     "email": "mvanhorn@gmail.com",
@@ -26,7 +26,7 @@
   "interface": {
     "displayName": "Last 30 Days",
     "shortDescription": "Research recent discussion across social and web sources",
-    "longDescription": "Use Last 30 Days to research what people are saying, upvoting, sharing, and betting on across Reddit, X, YouTube, TikTok, Instagram, Hacker News, Polymarket, GitHub, and web sources.",
+    "longDescription": "Research any topic across Reddit, X, YouTube, TikTok, Instagram, Hacker News, Polymarket, GitHub, and 5+ more sources. AI agent scores by upvotes, likes, and real money - not editors.",
     "developerName": "Matt Van Horn",
     "category": "Research",
     "capabilities": [
